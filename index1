@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<head>
+<link href='http://fonts.googleapis.com/css?family=Roboto:400,500,700' rel='stylesheet' type='text/css'>
+<style>
+body{font-family:'Roboto', sans-serif;}
+.node {stroke-width: 1px;cursor:pointer;}
+.infoContainer{font-family:'Roboto', sans-serif;position:relative;}
+.consumptionUnit{font-size:12px;}
+hr{border: solid #ddd;border-width: 1px 0 0;clear: both;margin: 22px 0 21px;height: 0;}
+.title{font-size:20px;}
+.description{display:none;position:absolute;padding:25px 10px;background:white;border:1px solid #ccc;width:500px;top:145px;}
+.close{position:absolute;right:5px;top:5px;cursor:pointer;font-size:12px;}
+.searchContainer {margin-top: 3px;float: left;margin-bottom: 5px;}
+.error{display:none;font-size:10px;color:red;position:absolute;margin-top:10px;left:390px;}
+</style>
+<script src="http://d3js.org/d3.v3.min.js"></script>
+<script type="text/javascript" src="js/tooltip.js"></script>
+<script type='text/javascript' src='http://code.jquery.com/jquery-1.8.3.js'></script>
+<script>
+$(function(){
+  $('.learnMore').click(function(){
+    $('.description').show();
+  });
+  $('.close').click(function(){
+    $('.description').hide();
+  });
+})
+</script>
+</head>
+<body>
+<div class="infoContainer">
+  <div class="title">Energy map of New York City by zip Code</div>	
+  <div class="max">Maximum: </div>
+  <div class="min">Min: </div>
+  <div class="total">Total Consumption:</div>
+  <div class="consumptionUnit">note: Consumption data in GJ</div>
+  <div class="searchContainer">zip code:
+    <input type="text" id="searchBox"/><input type="button" id="search" value="search" />
+    <input type="button" id="reset" value="Reset Result" />
+  </div>
+  <div class="error"><i>Invalid Zip Code</i></div>
+  <hr>
+  <button class="learnMore">Learn More</button>
+  <div class="description"><div class="close">Close X</div>The size of a circle reprents energy consumed at a zip code. Hovering over the shapes will display the zip codes and the energy consumed in that zip code and what is that zip code zoned for.</div>
+</div>
+<script>
+
+var width = 1100,
+    height = 1100;
+
+var sum = 0;
+
+d3.json('http://data.cityofnewyork.us/resource/xm9j-adfx.json', function (data) {
+
+    var nodes = d3.range(data.length).map(function (i) {
+        return {
+            index: i
+        };
+    });
+
+    var force = d3.layout.force()
+        .nodes(data)
+        .size([width, height])
+        .on("tick", tick)
+        .start();
+
+    var svg = d3.select("body").append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    //calculating the maximum
+    var max = d3.max(data, function (d) {
+        return +d.consumption_gj_;
+    });
+    $('.max').append(max);
+
+    //calculating the minimum
+    var min = d3.min(data, function (d) {
+        return +d.consumption_gj_;
+    });
+    $('.min').append(min);
+
+    //calculating total
+    data.forEach(function (d) {
+        sum += +d.consumption_gj_;
+    });
+    $('.total').append(sum);
+
+    //setting domain and range
+    var rScale = d3.scale.linear()
+        .domain([min, max])
+        .range([7.5, 70]);
+
+
+    var node = svg.selectAll(".node")
+        .data(data)
+        .enter().append("circle")
+        .attr("class", "node")
+        .attr("cx", function (d) {
+        return d.x;
+    })
+        .attr("cy", function (d) {
+        return d.y;
+    })
+        .attr("r", function (d) {
+        return rScale(d.consumption_gj_);
+    })
+        .style("fill", 'red')
+        .style("stroke", 'black')
+        .call(force.drag)
+        .call(d3.helper.tooltip()
+        .attr({
+        class: function (d, i) {
+            return d + ' ' + i + ' A';
+        }
+    })
+        .style({
+        color: 'black'
+    })
+        .text(function (d, i) {
+        return '<div>Zip Code: ' + JSON.parse(data[i].zip_code.human_address).zip + '</div><div>Consumption GJ: ' + d.consumption_gj_ + '</div><div>Zone/ Building type: ' + d.building_type_service_class_ + '</div>';
+    }))
+        .on("mousedown", function () {
+        d3.event.stopPropagation();
+    })
+        .attr("zipcode", function (d, i) {
+        return JSON.parse(data[i].zip_code.human_address).zip;
+    });
+
+    function tick(e) {
+        node.attr("cx", function (d) {
+            return d.x;
+        })
+            .attr("cy", function (d) {
+            return d.y;
+        });
+    }
+
+    // Search operation starts here
+    $('#search').click(function () {
+        var searchVal = $('#searchBox').val();
+        var zipVal = d3.selectAll('.node[zipcode="' + searchVal + '"]');
+        if (zipVal[0].length > 0) {
+            d3.selectAll('.node[zipcode="' + searchVal + '"]').style('fill', 'blue');
+            $('.error').hide();
+        } else {
+            $('.error').show();
+        }
+    });
+
+	$('#reset').click(function(){
+		$('#searchBox').val('');
+		node.style('fill', 'red');
+		$('.error').hide();
+	});
+
+});
+
+
+
+</script>
